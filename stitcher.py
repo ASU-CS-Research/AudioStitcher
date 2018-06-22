@@ -7,7 +7,7 @@ path = 'C:\\Users\\wattsij\\Documents\\audio_combiner\\audio1'
 directory = os.fsencode(path)
 outfile = 'C:\\Users\\wattsij\\Documents\\audio_combiner\\output.wav'
 num_of_files = 20  # 3166
-samples_per_file = 441344
+samples_per_file = 441249  # *2 = 882498 original is 441344 cutting first 95 samples off
 out = np.zeros((3 * samples_per_file,), dtype=np.int16)
 i = 0
 k = 0
@@ -15,7 +15,8 @@ files_processed = 0
 
 
 def cross_fade(fade_array):
-    fade_in = np.arange(.00333, 1, .00133)  # 300 samples long
+    final = np.zeros((3 * samples_per_file - 400,), dtype=np.int16)
+    fade_in = np.linspace(0, 1, 200)  # 200 samples long
     fade_in = np.hstack((fade_in, np.ones(samples_per_file - fade_in.size)))
     fade_out = fade_in[:: -1]
     beginning = fade_array[0:samples_per_file]
@@ -25,7 +26,18 @@ def cross_fade(fade_array):
     beginning = beginning * fade_out
     middle = (middle * fade_out) * fade_in
     end = end * fade_in
-    final = np.hstack((beginning, middle, end))
+
+    k = 0
+    for item in final:
+        if k < samples_per_file:
+            final[k] += beginning[k]
+        if samples_per_file - 200 <= k < samples_per_file * 2 - 200:
+            final[k] += middle[k - samples_per_file + 200]
+        if samples_per_file * 2 - 400 <= k < samples_per_file * 3 - 400:
+            final[k] += end[k - samples_per_file * 2 + 400]
+        k += 1
+
+                                    # final = np.hstack((beginning, middle, end))
     final = np.int16(final)
     return final
 
@@ -36,8 +48,8 @@ for file in os.listdir(directory):
 
         path_file = path + '\\' + filename
         rate, data = scipy.io.wavfile.read(path_file)  # READS RATE AND DATA ARRAY
-        for j in range(samples_per_file):
-            out[(i * samples_per_file) + j] = data[j]
+        for j in range(95, samples_per_file + 95):
+            out[(i * samples_per_file) + (j - 95)] = data[j]
         i += 1
         files_processed += 1
 
