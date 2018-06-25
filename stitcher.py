@@ -7,7 +7,7 @@ path = 'C:\\Users\\wattsij\\Documents\\audio_combiner\\audio1'
 directory = os.fsencode(path)
 outfile = 'C:\\Users\\wattsij\\Documents\\audio_combiner\\output.wav'
 num_of_files = 20  # 3166
-samples_per_file = 441249  # *2 = 882498 original is 441344 cutting first 95 samples off
+samples_per_file = 441249  # *3 = 882498 original is 441344 cutting first 95 samples off
 out = np.zeros((3 * samples_per_file,), dtype=np.int16)
 i = 0
 k = 0
@@ -15,35 +15,32 @@ files_processed = 0
 
 
 def cross_fade(fade_array):
-    final = np.zeros((3 * samples_per_file - 400,), dtype=np.int16)
+    fade_array = np.float64(fade_array)
     fade_in = np.linspace(0, 1, 200)  # 200 samples long
-    fade_in = np.hstack((fade_in, np.ones(samples_per_file - fade_in.size)))
+    # fade_in = np.arange(0, 200)
+
     fade_out = fade_in[:: -1]
-    beginning = fade_array[0:samples_per_file]
+
+    beginning = fade_array[0:samples_per_file]  # splitting file into thirds
     middle = fade_array[samples_per_file: (2 * samples_per_file)]
     end = fade_array[(2 * samples_per_file):(3 * samples_per_file)]
 
-    beginning = beginning * fade_out
-    middle = (middle * fade_out) * fade_in
-    end = end * fade_in
+    beginning[samples_per_file - 200: samples_per_file] *= fade_out  # applying fade_in/fade_out to sections
+    middle[0:200] *= fade_in
+    middle[samples_per_file - 200: samples_per_file] *= fade_out
+    end[0:200] *= fade_in
+    final = np.zeros((3 * samples_per_file - 400,), dtype=np.float64)
 
-    k = 0
-    for item in final:
-        if k < samples_per_file:
-            final[k] += beginning[k]
-        if samples_per_file - 200 <= k < samples_per_file * 2 - 200:
-            final[k] += middle[k - samples_per_file + 200]
-        if samples_per_file * 2 - 400 <= k < samples_per_file * 3 - 400:
-            final[k] += end[k - samples_per_file * 2 + 400]
-        k += 1
+    final[0:samples_per_file] += beginning  # adding modified files together
+    final[(samples_per_file - 200):(samples_per_file * 2 - 200)] += middle
+    final[(samples_per_file * 2 - 400):(samples_per_file * 3 - 400)] += end
 
-                                    # final = np.hstack((beginning, middle, end))
-    final = np.int16(final)
+    final = np.int16(final)  # converting to int16
     return final
 
 
 for file in os.listdir(directory):
-    filename = os.fsdecode(file)
+    filename = os.fsdecode(file)  # iterates through directory
     if filename.endswith(".wav"):
 
         path_file = path + '\\' + filename
