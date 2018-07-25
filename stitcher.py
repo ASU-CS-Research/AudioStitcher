@@ -1,58 +1,73 @@
 import os
-import scipy.io.wavfile
 import wave
 import numpy as np
-
-path = 'C:\\Users\\wattsij\\Documents\\audio_combiner\\audio1'
+import wavio
+path = 'C:\\Users\\wattsij\\Documents\\audio_combiner\\audio'
 directory = os.fsencode(path)
-outfile = 'C:\\Users\\wattsij\\Documents\\audio_combiner\\output.wav'
-num_of_files = 20  # 3166
-samples_per_file = 441249  # *3 = 882498 original is 441344 cutting first 95 samples off
-out = np.zeros((3 * samples_per_file,), dtype=np.int16)
+files_to_combine = 9
+num_of_files = 9  # 3166
+s_p_f = 2880417  # 2880512 original ||||| 2880417 = cutting first 95 samples off
+out = np.zeros((files_to_combine * s_p_f))
 i = 0
 k = 0
 files_processed = 0
+fade_length = 1500
 
 
 def cross_fade(fade_array):
-    fade_array = np.float64(fade_array)
-    fade_in = np.linspace(0, 1, 200)  # 200 samples long
-    # fade_in = np.arange(0, 200)
 
+    fade_array = np.float64(fade_array)
+
+    fade_in = np.linspace(0, 1, fade_length)
     fade_out = fade_in[:: -1]
 
-    beginning = fade_array[0:samples_per_file]  # splitting file into thirds
-    middle = fade_array[samples_per_file: (2 * samples_per_file)]
-    end = fade_array[(2 * samples_per_file):(3 * samples_per_file)]
+    beginning = fade_array[0:s_p_f]  # splitting file into three parts
 
-    beginning[samples_per_file - 200: samples_per_file] *= fade_out  # applying fade_in/fade_out to sections
-    middle[0:200] *= fade_in
-    middle[samples_per_file - 200: samples_per_file] *= fade_out
-    end[0:200] *= fade_in
-    final = np.zeros((3 * samples_per_file - 400,), dtype=np.float64)
+    middles = fade_array[s_p_f : s_p_f * (files_to_combine - 1)]
 
-    final[0:samples_per_file] += beginning  # adding modified files together
-    final[(samples_per_file - 200):(samples_per_file * 2 - 200)] += middle
-    final[(samples_per_file * 2 - 400):(samples_per_file * 3 - 400)] += end
 
-    final = np.int16(final)  # converting to int16
+    end = fade_array[((files_to_combine - 1) * s_p_f):(files_to_combine * s_p_f)]
+
+
+    beginning[s_p_f - fade_length: s_p_f] *= fade_out  # applying fade_in/fade_out to sections
+
+    end[0:fade_length] *= fade_in
+    final = np.zeros(((files_to_combine * s_p_f) - ((files_to_combine - 1) * fade_length)), dtype=np.float64)
+
+    for x in range(files_to_combine - 2):                   #applies fade then adds to final
+        array = middles[(x * s_p_f):((x+1) * s_p_f)]
+        array[0: fade_length] *= fade_in
+        array[s_p_f - fade_length: s_p_f] *= fade_out
+        final[((x+1) * s_p_f):((x+2) * s_p_f)] += array
+
+    final[0:s_p_f] += beginning  # adding modified files together
+
+    final[((s_p_f * (files_to_combine - 1)) - ((files_to_combine - 1) * fade_length)):
+          ((s_p_f * files_to_combine) - ((files_to_combine - 1) * fade_length))] += end
+
+        #final = np.int16(final)  # converting to int16
     return final
 
 
 for file in os.listdir(directory):
-    filename = os.fsdecode(file)  # iterates through directory
+    filename = os.fsdecode(file)  # iterates through directory((x+1) * s_p_f)
     if filename.endswith(".wav"):
 
         path_file = path + '\\' + filename
-        rate, data = scipy.io.wavfile.read(path_file)  # READS RATE AND DATA ARRAY
-        for j in range(95, samples_per_file + 95):
-            out[(i * samples_per_file) + (j - 95)] = data[j]
+
+        wav = wavio.read(path_file)  # READS RATE AND DATA ARRAY
+        data = wav.data / 2**23
+        rate = wav.rate
+        sample_width = wav.sampwidth
+
+        for j in range(95, s_p_f + 95):
+            out[(i * s_p_f) + (j - 95)] = data[j]
         i += 1
         files_processed += 1
 
-        if ((i % 3) == 0) or (num_of_files == files_processed):
+        if ((i % files_to_combine) == 0) or (num_of_files == files_processed):
             out = cross_fade(out)
-            scipy.io.wavfile.write("output" + str(k) + ".wav", rate, out)
-            out = np.zeros((3 * samples_per_file,), dtype=np.int16)
+            wavio.write("output" + str(k) + ".wav", out * 2 ** 23, rate, sampwidth=sample_width, scale='none')
+            out = np.zeros((files_to_combine * s_p_f,))
             k += 1
             i = 0
