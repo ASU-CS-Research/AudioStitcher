@@ -2,16 +2,17 @@ import os
 import wave
 import numpy as np
 import wavio
-path = 'C:\\Users\\wattsij\\Documents\\audio_combiner\\audio'
+#from pydub import AudioSegment
+path = 'C:\\Users\\wattsij\\Documents\\audio_combiner\\audio1'
 directory = os.fsencode(path)
-files_to_combine = 9 # number of files to combine in one file
-num_of_files = 9  # number of files in directory
-s_p_f = 2880417  #(samples per file) 2880512 original ||||| 2880417 = cutting first 95 samples off
+files_to_combine = 37  # number of files to combine in one file
+num_of_files = 37  # number of files in directory
+s_p_f = 2880417         #(samples per file) 2880512 original ||||| 2880417 = cutting first 95 samples off
 out = np.zeros((files_to_combine * s_p_f))
 i = 0
 k = 0
 files_processed = 0
-fade_length = 1500
+fade_length = 1000
 
 
 def cross_fade(fade_array):
@@ -32,7 +33,7 @@ def cross_fade(fade_array):
     end[0:fade_length] *= fade_in
     final = np.zeros(((files_to_combine * s_p_f) - ((files_to_combine - 1) * fade_length)), dtype=np.float64)
 
-    for x in range(files_to_combine - 2):                   #applies fade to middle files then adds to final
+    for x in range(files_to_combine - 2):     #applies fade to middle files then adds to final
         array = middles[(x * s_p_f):((x+1) * s_p_f)]
         array[0: fade_length] *= fade_in
         array[s_p_f - fade_length: s_p_f] *= fade_out
@@ -43,7 +44,7 @@ def cross_fade(fade_array):
     final[((s_p_f * (files_to_combine - 1)) - ((files_to_combine - 1) * fade_length)):
           ((s_p_f * files_to_combine) - ((files_to_combine - 1) * fade_length))] += end  # adds last file to final
 
-        #final = np.int16(final)  # converting to int16
+    #final = np.int16(final)  # converting to int16
     return final
 
 
@@ -64,8 +65,11 @@ for file in os.listdir(directory):
         files_processed += 1
 
         if ((i % files_to_combine) == 0) or (num_of_files == files_processed):
-            out = cross_fade(out)
-            wavio.write("output" + str(k) + ".wav", out * 2 ** 23, rate, sampwidth=sample_width, scale='none')
+            out = cross_fade(out) 
+            name = str("output" + str(k) + ".wav")
+            wavio.write(name, out * 2 ** 23, rate, sampwidth=sample_width, scale='none')
+            #wavfile = AudioSegment.from_wav(path + "\\" + name)
+            #wavfile.export(path + "\\" + name, format="mp3")
             out = np.zeros((files_to_combine * s_p_f,))
             k += 1
             i = 0
